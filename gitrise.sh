@@ -16,6 +16,7 @@ current_build_status_text=""
 exit_code=0
 log_url=""
 build_artifacts_slugs=()
+output_file=""
 
 function usage() {
     echo ""
@@ -28,6 +29,7 @@ function usage() {
     echo "      --download-artifacts   <string>    List of build artifact names to download in the form of name1,name2" 
     echo "  -e, --env                  <string>    List of environment variables in the form of key1:value1,key2:value2"
     echo "  -h, --help                             Print this help text"
+    echo "  -o, --output-file          <string>    Path to file where build information will be written"
     echo "  -p, --poll                  <string>   Polling interval (in seconds) to get the build status."
     echo "      --stream                           Stream build logs"
     echo "  -s, --slug                  <string>   Bitrise project slug"
@@ -92,6 +94,10 @@ while [ $# -gt 0 ]; do
     ;;
     -p|--poll)
         STATUS_POLLING_INTERVAL="$2"
+        shift;shift
+    ;;
+    -o|--output-file)
+        output_file="$2"
         shift;shift
     ;;
     --download-artifacts)
@@ -211,6 +217,16 @@ function trigger_build() {
     else 
         build_url=$(echo "$response" | jq ".build_url" | sed 's/"//g')
         build_slug=$(echo "$response" | jq ".build_slug" | sed 's/"//g')
+        
+        # Write build information to output file if specified
+        if [ -n "$output_file" ]; then
+            {
+                echo "build_slug=$build_slug"
+                echo "build_url=$build_url"
+                echo "project_slug=$PROJECT_SLUG"
+                echo "workflow=$WORKFLOW"
+            } > "$output_file"
+        fi
     fi
     printf "\nHold on... We're about to liftoff! 🚀\n \nBuild URL: %s\n" "${build_url}"
 }
@@ -261,6 +277,27 @@ function handle_status_response() {
         current_build_status_text="${build_status_text}"
     fi
     build_status=$(echo "$response" | jq ".data .status")
+    
+    # Update output file with latest timestamps if specified
+    if [ -n "$output_file" ]; then
+        local triggered_at=$(echo "$response" | jq -r '.data.triggered_at // empty')
+        local started_at=$(echo "$response" | jq -r '.data.started_on_worker_at // empty')
+        local finished_at=$(echo "$response" | jq -r '.data.finished_at // empty')
+        
+        # Atomically update file with new timestamp data
+        # Keep existing build info, update timestamps
+        {
+            grep '^build_slug=' "$output_file" 2>/dev/null || true
+            grep '^build_url=' "$output_file" 2>/dev/null || true
+            grep '^project_slug=' "$output_file" 2>/dev/null || true
+            grep '^workflow=' "$output_file" 2>/dev/null || true
+            [ -n "$triggered_at" ] && echo "triggered_at=$triggered_at"
+            [ -n "$started_at" ] && echo "started_on_worker_at=$started_at"
+            [ -n "$finished_at" ] && echo "finished_at=$finished_at"
+            echo "status=$build_status"
+            echo "status_text=$build_status_text"
+        } > "$output_file.tmp" && mv "$output_file.tmp" "$output_file"
+    fi
 }
 
 function stream_logs() {
@@ -434,6 +471,14 @@ if [ "$0" = "${BASH_SOURCE[0]}" ] && [ -z "${TESTING_ENABLED}" ]; then
     validate_input
     trigger_build
     process_build
+    
+    # Final status guarantee: ensure output file has complete data before exit
+    if [ -n "$output_file" ] && [ -n "$build_slug" ]; then
+        echo "INFO: Writing final build state to output file..."
+        check_build_status
+        echo "INFO: Output file updated with final state"
+    fi
+    
     [ -z "$STREAM" ] && get_build_logs 
     build_status_message "$build_status"
     [ -n "$BUILD_ARTIFACTS" ] && download_build_artifacts
