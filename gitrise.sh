@@ -202,7 +202,7 @@ function trigger_build() {
     if [ -z "${TESTING_ENABLED}" ]; then 
         local command="curl --silent -X POST https://api.bitrise.io/v0.1/apps/$PROJECT_SLUG/builds \
                 --data '$(generate_build_payload)' \
-                --header 'Accept: application/json' --header 'Authorization: $ACCESS_TOKEN'"
+                --header 'Accept: application/json' --header 'Content-Type: application/json' --header 'Authorization: $ACCESS_TOKEN'"
         response=$(eval "${command}") 
     else
         response=$(<./testdata/"$1"_build_trigger_response.json)
@@ -249,7 +249,7 @@ function check_build_status() {
     local retry=3
     if [ -z "${TESTING_ENABLED}" ]; then
         local command="curl --silent -X GET -w \"status_code:%{http_code}\" https://api.bitrise.io/v0.1/apps/$PROJECT_SLUG/builds/$build_slug \
-            --header 'Accept: application/json' --header 'Authorization: $ACCESS_TOKEN'"
+            --header 'Accept: application/json' --header 'Content-Type: application/json' --header 'Authorization: $ACCESS_TOKEN'"
         response=$(eval "${command}")
     else
         response=$(< ./testdata/"$1")
@@ -306,7 +306,7 @@ function stream_logs() {
 
     if [ -z "${TESTING_ENABLED}" ] ; then
         local command="curl --silent -X GET https://api.bitrise.io/v0.1/apps/$PROJECT_SLUG/builds/$build_slug/log \
-            --header 'Accept: application/json' --header 'Authorization: $ACCESS_TOKEN'"
+            --header 'Accept: application/json' --header 'Content-Type: application/json' --header 'Authorization: $ACCESS_TOKEN'"
         response=$(eval "$command")
     else
         response="$(< ./testdata/"$1"_log_info_response.json)"
@@ -344,7 +344,7 @@ function get_build_logs() {
         if [ -z "${TESTING_ENABLED}" ] ; then
             sleep "$polling_interval"
             local command="curl --silent -X GET https://api.bitrise.io/v0.1/apps/$PROJECT_SLUG/builds/$build_slug/log \
-                --header 'Accept: application/json' --header 'Authorization: $ACCESS_TOKEN'"
+                --header 'Accept: application/json' --header 'Content-Type: application/json' --header 'Authorization: $ACCESS_TOKEN'"
             response=$(eval "$command")
 
         else
@@ -404,7 +404,7 @@ function get_build_artifacts() {
     local response=""
     if [ -z "${TESTING_ENABLED}" ]; then 
         local command="curl --silent -X GET https://api.bitrise.io/v0.1/apps/$PROJECT_SLUG/builds/$build_slug/artifacts \
-                            --header 'Accept: application/json' --header 'Authorization: $ACCESS_TOKEN'"
+                            --header 'Accept: application/json' --header 'Content-Type: application/json' --header 'Authorization: $ACCESS_TOKEN'"
         response=$(eval "${command}") 
     else
         response=$(<./testdata/build_artifacts_response.json)
@@ -432,7 +432,7 @@ function download_single_artifact() {
     local response=""
     if [ -z "${TESTING_ENABLED}" ]; then 
         local command="curl --silent -X GET https://api.bitrise.io/v0.1/apps/$PROJECT_SLUG/builds/$build_slug/artifacts/$artifact_slug \
-                            --header 'Accept: application/json' --header 'Authorization: $ACCESS_TOKEN'"
+                            --header 'Accept: application/json' --header 'Content-Type: application/json' --header 'Authorization: $ACCESS_TOKEN'"
         response=$(eval "${command}") 
     else
         response=$(<./testdata/single_artifact_response.json)
